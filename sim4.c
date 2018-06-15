@@ -108,7 +108,7 @@ void simulate(bool traceonly)
 			break;
 		case 0xB:		// XCH
 			if (traceonly) {
-				sprintf(buffer, "XCH");
+				sprintf(buffer, "XCH %d", opa);
 				return;
 			}
 			tmp = cpu.A;
@@ -676,6 +676,23 @@ int main(int argc, char **argv)
 		}
 		c = getch();
 		if (c == 'c') simulate(false);
-		if (c == 'q') break;		
+		if (c == 'q') break;
+		if (c == 't') cpu.T = ~cpu.T;
+		if (c == 'r') {
+			uint8_t r, v;
+			reset_terminal_mode();
+			printf("RAM#, VALUE? ");
+			scanf("%d %d", &r, &v);
+			set_conio_terminal_mode();
+			ram[r].port = v;
+			}
+		if (c == 'o') {
+			uint8_t r, v;
+			reset_terminal_mode();
+			printf("ROM#, VALUE? ");
+			scanf("%d %d", &r, &v);
+			set_conio_terminal_mode();
+			rom_ports[r] = v;
+			}
 	}
 }
