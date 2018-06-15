@@ -25,6 +25,17 @@
 		  (n) & 2 ? '1' : '0', \
 		  (n) & 1 ? '1' : '0'
 
+#define BINARY20(n) (n) & 512 ? '1' : '0', \
+		  (n) & 256 ? '1' : '0', \
+		  (n) & 128 ? '1' : '0', \
+		  (n) & 64 ? '1' : '0', \
+		  (n) & 32 ? '1' : '0', \
+		  (n) & 16 ? '1' : '0', \
+		  (n) & 8 ? '1' : '0', \
+		  (n) & 4 ? '1' : '0', \
+		  (n) & 2 ? '1' : '0', \
+		  (n) & 1 ? '1' : '0'
+
 uint8_t memory[4096];
 
 #define MAXTRACE 30
@@ -63,6 +74,10 @@ typedef struct {
 } RAM;
 
 RAM ram[16];
+
+uint16_t i4003;
+bool clk_up;
+bool clk_down;
 
 uint8_t rom_ports[16];
 
@@ -539,21 +554,25 @@ void show_status()
 	color(36);
 	for (int i = 0; i < 4; i++) {
 		locate(2+i*7, 2);
-		printf("---- 4002 #%02d ----", i);
+		printf("------- 4002 #%02d -------", i);
 		for (int j = 0; j < 4; j++) {
 			for (int k = 0; k < 16; k++) {	
 				locate(3+i*7 + j, 3+k);
 				printf("%x", ram[i].ramreg[j].character[k]);
-			}	
+			}
+			for (int k = 0; k < 4; k++) {
+				locate(3+i*7 + j, 20+k);
+				printf("%x", ram[i].ramreg[j].status[k]);
+			}
 		}
 		locate(2+i*7+5, 4);
 		printf("Port: %c%c%c%c", BINARY(ram[i].port));
 	}
 	
 	color(35);
-	locate(2, 24); printf("---- 4004 CPU ----");
-	locate(3, 24); printf(" A = %c%c%c%c (%X)", BINARY(cpu.A), cpu.A);
-	locate(4, 24); printf(" CY = %c   T = %c", cpu.CY ? '1' : '0', cpu.T ? '1' : '0');
+	locate(2, 34); printf("---- 4004 CPU ----");
+	locate(3, 34); printf(" A = %c%c%c%c (%X)", BINARY(cpu.A), cpu.A);
+	locate(4, 34); printf(" CY = %c   T = %c", cpu.CY ? '1' : '0', cpu.T ? '1' : '0');
 	for (int i = 0; i < 8; i++) {
 		uint8_t opa = i*2;
 		uint8_t rl = READREG;
@@ -561,20 +580,20 @@ void show_status()
 		uint8_t rr = READREG;
 		opa = i*2;
 		uint8_t p = READREGP;
-		locate(6+i, 24); printf("R%d = %c%c%c%c R%d = %c%c%c%c (%02X)", i*2,
+		locate(6+i, 34); printf("R%d = %c%c%c%c R%d = %c%c%c%c (%02X)", i*2,
 					BINARY(rl), i*2+1, BINARY(rr), p);
 	}
-	locate(15, 24); printf(" PC %03X", cpu.rom * 256 + cpu.romaddr);
+	locate(15, 34); printf(" PC %03X", cpu.rom * 256 + cpu.romaddr);
 	for (int i = 0; i < 4; i++) {
 		if (i == cpu.sp) color(32); else color(35);
-		locate(17+i, 24); printf(" STACK[%d] = %03X ", i, cpu.stack2[i] * 256 + cpu.stack[i]);
+		locate(17+i, 34); printf(" STACK[%d] = %03X ", i, cpu.stack2[i] * 256 + cpu.stack[i]);
 	}
 
 
 	color(33);
 	for (int i = 0; i < 4; i++) {
-		locate(23+i*4, 24); printf("---- 4001 #%02d ----", i);
-		locate(24+i*4, 26); printf(" Port: %c%c%c%c", BINARY(rom_ports[i]));
+		locate(23+i*4, 34); printf("---- 4001 #%02d ----", i);
+		locate(24+i*4, 36); printf(" Port: %c%c%c%c", BINARY(rom_ports[i]));
 	}
 
 
@@ -590,12 +609,14 @@ void show_status()
 	trace[MAXTRACE-1] = NULL;
 	for (int i = 0; i < MAXTRACE; i++) {
 		if (trace[i]) {
-			locate(2+i, 55); printf(trace[i]);
+			locate(2+i, 65); printf(trace[i]);
 		} else {
-		  locate(2+i,55); printf("%-25s", " ");
+		  locate(2+i,65); printf("%-25s", " ");
 		}
 	}		
-
+	color(32);
+	locate(30, 2); printf(" ---- 4003 on ROM0 ---- ");
+	locate(31, 4); printf("%c%c%c%c%c%c%c%c%c%c", BINARY20(i4003));
 
 }
 
@@ -694,5 +715,19 @@ int main(int argc, char **argv)
 			set_conio_terminal_mode();
 			rom_ports[r] = v;
 			}
+		if (rom_ports[0] & 1) {
+			if (!clk_up) {
+				clk_up = true;
+				clk_down = false;
+				i4003 <<= 1;
+				i4003 &= 1023;
+				i4003 |= (rom_ports[0] & 2) >> 1;
+			}
+		} else {
+			if (!clk_down) {
+				clk_down = true;
+				clk_up = false;
+			}
+		}
 	}
 }
